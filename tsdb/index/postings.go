@@ -207,6 +207,32 @@ func (p *MemPostings) Stats(label string, limit int) *PostingsStats {
 	}
 }
 
+// TopLabelValuesBySeriesCount returns up to limit values for labelName with the most associated series.
+func (p *MemPostings) TopLabelValuesBySeriesCount(labelName string, limit int) []Stat {
+	if limit <= 0 {
+		return nil
+	}
+
+	p.mtx.RLock()
+	valueCount := len(p.m[labelName])
+	p.mtx.RUnlock()
+
+	// Allocate outside the critical section so a large label map does not block writers in the allocator.
+	stats := make([]Stat, 0, valueCount)
+	p.mtx.RLock()
+	for value, postings := range p.m[labelName] {
+		stats = append(stats, Stat{Name: value, Count: uint64(len(postings))})
+	}
+	p.mtx.RUnlock()
+
+	topStats := &maxHeap{}
+	topStats.init(min(limit, len(stats)))
+	for _, stat := range stats {
+		topStats.push(stat)
+	}
+	return topStats.get()
+}
+
 // Get returns a postings list for the given label pair.
 func (p *MemPostings) Get(name, value string) Postings {
 	var lp []storage.SeriesRef
