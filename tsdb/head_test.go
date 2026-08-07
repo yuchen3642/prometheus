@@ -6033,6 +6033,15 @@ func TestPostingsCardinalityStats(t *testing.T) {
 	require.Equal(t, statsForSomeLabel1, head.PostingsCardinalityStats("n", 1))
 }
 
+func TestHeadTopLabelValuesBySeriesCount(t *testing.T) {
+	head := &Head{postings: index.NewMemPostings()}
+	head.postings.Add(1, labels.FromStrings(labels.MetricName, "metric_a"))
+	head.postings.Add(2, labels.FromStrings(labels.MetricName, "metric_a"))
+	head.postings.Add(3, labels.FromStrings(labels.MetricName, "metric_b"))
+
+	require.Equal(t, []index.Stat{{Name: "metric_a", Count: 2}}, head.TopLabelValuesBySeriesCount(labels.MetricName, 1))
+}
+
 func TestHeadAppender_AppendFloatWithSameTimestampAsPreviousHistogram(t *testing.T) {
 	head, _ := newTestHead(t, DefaultBlockDuration, wlog.CompressionNone, false)
 	t.Cleanup(func() { head.Close() })

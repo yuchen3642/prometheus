@@ -1043,6 +1043,11 @@ func (h *Head) PostingsCardinalityStats(statsByLabelName string, limit int) *ind
 	return h.cardinalityCache
 }
 
+// TopLabelValuesBySeriesCount returns up to limit values for labelName with the most associated series.
+func (h *Head) TopLabelValuesBySeriesCount(labelName string, limit int) []index.Stat {
+	return h.postings.TopLabelValuesBySeriesCount(labelName, limit)
+}
+
 func (h *Head) updateMinMaxTime(mint, maxt int64) {
 	for {
 		lt := h.MinTime()

@@ -912,7 +912,7 @@ func TestWithoutPostings(t *testing.T) {
 	}
 }
 
-func BenchmarkPostings_Stats(b *testing.B) {
+func BenchmarkPostingsCardinalityStats(b *testing.B) {
 	p := NewMemPostings()
 
 	var seriesID storage.SeriesRef
@@ -937,10 +937,16 @@ func BenchmarkPostings_Stats(b *testing.B) {
 		createPostingsLabelValues(fmt.Sprintf("area-%d", i), "new_area_of_work-", 1e3)
 		createPostingsLabelValues(fmt.Sprintf("request_id-%d", i), "owner_name_work-", 1e3)
 	}
-	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
-		p.Stats("__name__", 10)
-	}
+	b.Run("method=all-labels", func(b *testing.B) {
+		for n := 0; n < b.N; n++ {
+			p.Stats(labels.MetricName, 10)
+		}
+	})
+	b.Run("method=single-label", func(b *testing.B) {
+		for n := 0; n < b.N; n++ {
+			p.TopLabelValuesBySeriesCount(labels.MetricName, 10)
+		}
+	})
 }
 
 func TestMemPostingsStats(t *testing.T) {
@@ -970,6 +976,25 @@ func TestMemPostingsStats(t *testing.T) {
 	require.Equal(t, "label=value1", stats.LabelValuePairsStats[0].Name)
 
 	require.Equal(t, 3, stats.NumLabelPairs)
+}
+
+func TestMemPostingsTopLabelValuesBySeriesCount(t *testing.T) {
+	p := NewMemPostings()
+	p.Add(1, labels.FromStrings(labels.MetricName, "metric_a", "pod", "pod_1"))
+	p.Add(2, labels.FromStrings(labels.MetricName, "metric_a", "pod", "pod_2"))
+	p.Add(3, labels.FromStrings(labels.MetricName, "metric_a", "pod", "pod_3"))
+	p.Add(4, labels.FromStrings(labels.MetricName, "metric_b", "pod", "pod_4"))
+	p.Add(5, labels.FromStrings(labels.MetricName, "metric_b", "pod", "pod_5"))
+	p.Add(6, labels.FromStrings(labels.MetricName, "metric_c", "pod", "pod_6"))
+
+	expected := []Stat{
+		{Name: "metric_a", Count: 3},
+		{Name: "metric_b", Count: 2},
+	}
+	require.Equal(t, expected, p.TopLabelValuesBySeriesCount(labels.MetricName, 2))
+	require.Equal(t, expected, p.Stats(labels.MetricName, 2).CardinalityMetricsStats)
+	require.Empty(t, p.TopLabelValuesBySeriesCount("missing", 2))
+	require.Empty(t, p.TopLabelValuesBySeriesCount(labels.MetricName, 0))
 }
 
 func TestMemPostings_Delete(t *testing.T) {
